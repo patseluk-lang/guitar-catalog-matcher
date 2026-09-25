@@ -87,8 +87,12 @@ class BaseScraper(ABC):
         self.log.info("Screenshot saved: %s", path)
         return path
 
-    def collect(self, max_pages: int) -> list[Product]:
-        """Walk up to max_pages portions of the catalogue and return unique products."""
+    def collect(self, max_pages: int, known_detail_urls: set[str] | None = None) -> list[Product]:
+        """Walk up to max_pages portions of the catalogue and return unique products.
+
+        known_detail_urls: product pages that need not be opened again
+        because their characteristics are already stored.
+        """
         self.log.info("Started %s", self.start_url)
         products: list[Product] = []
         seen_urls: set[str] = set()
@@ -133,14 +137,21 @@ class BaseScraper(ABC):
             page += 1
 
         if self.opens_product_pages:
-            products = self._enrich_all(products)
+            products = self._enrich_all(products, known_detail_urls or set())
 
         self.log.info("Completed: %d products", len(products))
         return products
 
-    def _enrich_all(self, products: list[Product]) -> list[Product]:
+    def _enrich_all(self, products: list[Product], known_detail_urls: set[str]) -> list[Product]:
+        skipped = sum(product.url in known_detail_urls for product in products)
+        if skipped:
+            self.log.info("Product pages skipped (details already stored): %d", skipped)
+
         enriched = []
         for product in products:
+            if product.url in known_detail_urls:
+                enriched.append(product)
+                continue
             self.pause()
             try:
                 enriched.append(self.enrich(product))
