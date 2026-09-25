@@ -1,4 +1,6 @@
 """JAM: "Show more" button on the catalogue, characteristics on product pages."""
+import re
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
@@ -60,4 +62,8 @@ class JamScraper(BaseScraper):
             cells = row.find_elements(By.TAG_NAME, "td")
             if len(cells) == 2:
                 product.features[text_of(cells[0])] = text_of(cells[1])
+
+        code = re.sub(r"\D", "", first_text(self.driver.find_element(By.TAG_NAME, "body"), ".product-sku"))
+        if code:
+            product.features["Артикул"] = code
         return product

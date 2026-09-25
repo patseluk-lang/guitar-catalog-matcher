@@ -72,20 +72,23 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help="catalogue portions per shop: pages or 'show more' clicks (default: 1)",
     )
+    parser.add_argument(
+        "--refresh-details",
+        action="store_true",
+        help="open product pages again even if their details are already stored",
+    )
     return parser.parse_args()
 
 
-def collect(db: Database, run_id: int, shops: list[str], pages: int) -> list[Product]:
+def collect(db: Database, run_id: int, args: argparse.Namespace) -> list[Product]:
     products: list[Product] = []
     driver = webdriver.Chrome()
     try:
-        for shop in shops:
+        for shop in args.shops:
+            known = set() if args.refresh_details else db.urls_with_features(shop)
             try:
                 scraper = SCRAPERS[shop](driver)
-                shop_products = scraper.collect(
-                    max_pages=pages,
-                    known_detail_urls=db.urls_with_features(shop),
-                )
+                shop_products = scraper.collect(max_pages=args.pages, known_detail_urls=known)
             except Exception:  # one broken shop must not stop the others
                 log.exception("Shop %s failed", shop)
                 continue
@@ -115,9 +118,12 @@ def main() -> None:
     db = Database(DB_PATH)
     run_id = db.start_run(args.shops)
     logging.getLogger().addHandler(DatabaseErrorHandler(db, run_id))
-    log.info("Run %d started: shops=%s pages=%d", run_id, args.shops, args.pages)
+    log.info(
+        "Run %d started: shops=%s pages=%d refresh_details=%s",
+        run_id, args.shops, args.pages, args.refresh_details,
+    )
     try:
-        products = collect(db, run_id, args.shops, args.pages)
+        products = collect(db, run_id, args)
         db.finish_run(run_id, len(products))
         log.info("Run %d finished: %d products", run_id, len(products))
         print_summary(products, db.counts())
