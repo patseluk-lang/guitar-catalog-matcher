@@ -11,6 +11,7 @@ from pathlib import Path
 
 from catalog_matcher.matcher import (
     DB_PATH,
+    PREFIXES,
     Offer,
     build_groups,
     candidates,
@@ -82,6 +83,19 @@ def money(value) -> str:
     return "-" if value is None else f"{value:,}".replace(",", " ")
 
 
+def short_name(name: str) -> str:
+    """'Акустична гітара CORT AD880 (Natural Satin)' -> 'CORT AD880 (Natural Satin)'."""
+    for prefix in PREFIXES:
+        if name.upper().startswith(prefix):
+            return name[len(prefix):].strip()
+    return name
+
+
+def display_name(items: list[Offer]) -> str:
+    """One readable name for a group: the shortest one without the shop prefix."""
+    return min((short_name(offer.name) for offer in items), key=len)
+
+
 def group_keys(members: dict[int, list[Offer]]) -> dict[int, str]:
     """product_id -> one key per group (the same guitar gets the same key)."""
     keys = {}
@@ -133,7 +147,7 @@ def groups_section(groups, shops: list[str]) -> str:
                 continue
             mark = " cheapest" if offer.price == lowest else ""
             cells.append(f"<td class='num{mark}'><a href='{esc(offer.url)}'>{money(offer.price)}</a></td>")
-        rows.append(f"<tr><td>{esc(items[0].name)}</td>{''.join(cells)}</tr>")
+        rows.append(f"<tr><td>{esc(display_name(items))}</td>{''.join(cells)}</tr>")
     return (
         f"<h2>Same guitar in different shops ({len(groups)})</h2>"
         "<p class='muted'>Green: the cheapest where prices differ. Prices in UAH.</p>"
@@ -177,7 +191,7 @@ def conflicts_section(found) -> str:
     for items, differing in found:
         for part, values in differing.items():
             shown = "; ".join(f"{esc(shop)}: {esc(value)}" for shop, value in sorted(values.items()))
-            rows.append(f"<tr><td>{esc(items[0].name)}</td><td>{esc(part)}</td><td>{shown}</td></tr>")
+            rows.append(f"<tr><td>{esc(display_name(items))}</td><td>{esc(part)}</td><td>{shown}</td></tr>")
     return (
         f"<h2>Same guitar, different wood by shop ({len(found)})</h2>"
         f"<table><tr><th>Guitar</th><th>Part</th><th>Shops say</th></tr>{''.join(rows)}</table>"

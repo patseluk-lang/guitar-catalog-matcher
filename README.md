@@ -1,5 +1,7 @@
 # guitar-catalog-matcher
 
+[![tests](https://github.com/patseluk-lang/guitar-catalog-matcher/actions/workflows/tests.yml/badge.svg)](https://github.com/patseluk-lang/guitar-catalog-matcher/actions/workflows/tests.yml)
+
 Collects acoustic guitars from four Ukrainian music shops with **Selenium**, stores them in
 **SQLite** with price history, and finds **the same guitar across shops** even when every shop
 writes its name differently. On top of that it shows where shops describe the same guitar
@@ -11,6 +13,21 @@ Yamaha FG820 (Sunset Blue)                    JAM            22 011
 Акустична гітара Yamaha FG820 SB              MuzikAnt       22 011
                   -> one guitar: YAMAHAFG820SUNSETBLUE
 ```
+
+## Quick start
+
+Only Docker is needed:
+
+```
+git clone https://github.com/patseluk-lang/guitar-catalog-matcher.git
+cd guitar-catalog-matcher
+docker compose build
+docker compose run --rm app -m pytest                   # 72 tests, no internet needed
+docker compose run --rm app main.py                     # first page of every shop, ~5 minutes
+docker compose run --rm app -m catalog_matcher.report   # open reports/report.html
+```
+
+![Same guitar in different shops](docs/report-groups.png)
 
 ## Why
 
@@ -85,6 +102,8 @@ One run with three catalogue pages per shop (September 2026):
 | Similar models for a human | 3 |
 | Same guitar, different wood by shop | 36 groups |
 
+![Same guitar, different wood by shop](docs/report-conflicts.png)
+
 What the data shows:
 
 - **Prices mostly match to the hryvnia**, but not everywhere: 10 SX models cost about 5% more
@@ -120,6 +139,8 @@ catalog_matcher/
     matcher.py                levels 1-3 and wood conflicts
     report.py                 reports/report.html and reports/offers.csv
 tests/                        unit tests + Selenium tests on local HTML pages
+docs/                         report screenshots for this README
+.github/workflows/tests.yml   all tests on every push (GitHub Actions)
 ```
 
 Database tables: `shops`, `products` (one row per URL), `price_history` (a row per product
