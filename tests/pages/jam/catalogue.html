@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>JAM test catalogue</title></head>
+<body>
+<div class="catalog_section">
+  <div class="product-card--catalog">
+    <div class="product__title"><a href="product.html">Yamaha FG820 (Sunset Blue)</a></div>
+    <div class="product__price">22 011 грн</div>
+    <div class="product-presence">Є в наявності</div>
+  </div>
+  <div class="product-card--catalog">
+    <div class="product__title"><a href="product-2.html">Cort AD810 (Open Pore)</a></div>
+    <div class="product__price-action"><span class="new">5 499 грн</span><span class="old">5 999 грн</span></div>
+    <div class="product-presence">Є в наявності</div>
+  </div>
+</div>
+<a class="catalogue-more" href="#">Показати ще</a>
+<script>
+  // "Show more" adds cards to the same page, like on the real site.
+  document.querySelector(".catalogue-more").addEventListener("click", function (event) {
+    event.preventDefault();
+    setTimeout(function () {
+      var card = document.createElement("div");
+      card.className = "product-card--catalog";
+      card.innerHTML =
+        '<div class="product__title"><a href="product-3.html">Maxtone WGC4010 (Natural)</a></div>' +
+        '<div class="product__price">4 099 грн</div>' +
+        '<div class="product-presence">Під замовлення</div>';
+      document.querySelector(".catalog_section").appendChild(card);
+      event.target.remove();
+    }, 300);
+  });
+</script>
+</body></html>
