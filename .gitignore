@@ -3,5 +3,7 @@
 __pycache__/
 logs/
 screenshots/
+reports/
 *.db
 step*_*.py
+step*_*.txt
