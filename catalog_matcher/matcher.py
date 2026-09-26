@@ -205,15 +205,17 @@ def matched_groups(groups: Groups, members: dict[int, list[Offer]]):
     return sorted(result, key=lambda pair: name_key(pair[1][0].name))
 
 
-COLOUR_CODES = set(COLOURS.values()) | set(DEFAULT_COLOUR)
+# Wood named in the model name makes a different product: 'SA25 A SPRUCE' vs 'SA25 A MAHO'.
+WOOD_WORDS = {"SPRUCE", "MAHO", "MAHOGANY", "CEDAR", "WALNUT", "ROSEWOOD", "MAPLE"}
+VARIANT_CODES = set(COLOURS.values()) | set(DEFAULT_COLOUR) | WOOD_WORDS
 
 
 def colour_of(others: frozenset[str]) -> frozenset[str]:
-    """Colour words among the extra words; no colour means Natural.
+    """Colour (and wood) words among the extra words; no colour means Natural.
 
-    {'OP', 'W', 'BAG'} -> {'OP'};  {'W', 'BAG'} -> {'NAT'}
+    {'OP', 'W', 'BAG'} -> {'OP'};  {'W', 'BAG'} -> {'NAT'};  {'A', 'SPRUCE'} -> {'SPRUCE'}
     """
-    return (others & COLOUR_CODES) or frozenset({"NAT"})
+    return (others & VARIANT_CODES) or frozenset({"NAT"})
 
 
 def colours_compatible(others_a: frozenset[str], others_b: frozenset[str]) -> bool:
@@ -309,8 +311,12 @@ def print_groups(groups) -> None:
         print(f"\n{name_key(items[0].name)}  [matched by: {', '.join(sorted(evidence))}]  ({price_mark})")
         for offer in items:
             print(f"    {offer.shop:<12} {offer.price!s:>7}  {offer.name}")
+    all_shops = {offer.shop for _, items in groups for offer in items}
     shops_per_group = [len({offer.shop for offer in items}) for _, items in groups]
-    print(f"\nGroups: {len(groups)}, of them in all three shops: {shops_per_group.count(3)}")
+    print(
+        f"\nGroups: {len(groups)}, of them in all {len(all_shops)} shops: "
+        f"{shops_per_group.count(len(all_shops))}"
+    )
 
 
 def print_candidates(pairs: list[tuple[Offer, Offer]]) -> None:

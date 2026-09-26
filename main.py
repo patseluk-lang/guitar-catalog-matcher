@@ -7,13 +7,14 @@ from selenium import webdriver
 
 from catalog_matcher.database import Database
 from catalog_matcher.models import Product
+from catalog_matcher.scrapers.dommuzyki import DommuzykiScraper
 from catalog_matcher.scrapers.guitarhouse import GuitarHouseScraper
 from catalog_matcher.scrapers.jam import JamScraper
 from catalog_matcher.scrapers.muzikant import MuzikantScraper
 
 SCRAPERS = {
     scraper.shop: scraper
-    for scraper in (MuzikantScraper, JamScraper, GuitarHouseScraper)
+    for scraper in (MuzikantScraper, JamScraper, GuitarHouseScraper, DommuzykiScraper)
 }
 DB_PATH = Path("data") / "catalog.db"
 LOGS = Path("logs")
