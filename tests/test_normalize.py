@@ -17,6 +17,7 @@ from catalog_matcher.normalize import NOT_SPECIFIED, normalise, wood
         ("Swietenia (Червоне дерево)", "червоне дерево"),
         ("Полісандр", "палісандр"),
         ("Лаурель (Laurel)", "лавр"),
+        ("Лавр", "лавр"),
         ("ABS-пластик", "пластик"),
         ("HPL", "ламінат"),
         ("Інженерна деревина", "ламінат"),
@@ -37,6 +38,13 @@ def test_neck_with_fretboard_is_split():
     assert normalise({"Гриф": "Нато з палісандровою накладкою"}) == {
         "Гриф": "нато",
         "Накладка грифа": "палісандр",
+    }
+
+
+def test_laurel_after_with_board():
+    assert normalise({"Гриф": "Червоне дерево (Mahogany) з накладкою з лауреля (Laurel)"}) == {
+        "Гриф": "червоне дерево",
+        "Накладка грифа": "лавр",
     }
 
 

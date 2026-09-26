@@ -27,6 +27,8 @@ def offer(product_id, shop, name, price=1000, **features):
         ("Yamaha FG820 SB", "Акустична гітара YAMAHA FG820 (Sunset Blue)"),  # Yamaha: SB = Sunset Blue
         ("Cort AD810 (Black Satin)", "CORT AD810 BKS"),
         ("Parksons JB4111 Black", "PARKSONS JB-4111 BLK"),
+        ("Yamaha FS820 RR", "YAMAHA FS820 (Ruby Red)"),
+        ("Yamaha FS820 TQ", "Yamaha FS820 (Turquoise)"),
     ],
 )
 def test_same_guitar_same_key(first, second):
@@ -98,6 +100,21 @@ def test_groups_join_by_code_and_by_name():
     evidence, items = matched[0]
     assert evidence == {"code", "name"}
     assert [item.product_id for item in items] == [2, 1, 3]  # sorted by shop
+
+
+def test_one_shop_never_joins_itself():
+    # Dommuzyki lists both at different prices: with "no colour = Natural" they share a key,
+    # but a shop does not sell the same guitar twice, so only the first one joins the group.
+    offers = [
+        offer(1, "dommuzyki", "ALFABETO WALNUT41", 5170),
+        offer(2, "dommuzyki", "ALFABETO WALNUT41 NAT", 6103),
+        offer(3, "muzikant", "Alfabeto Walnut41", 5170),
+    ]
+    groups, members = build_groups(offers)
+    matched = matched_groups(groups, members)
+
+    assert len(matched) == 1
+    assert sorted(item.product_id for item in matched[0][1]) == [1, 3]
 
 
 def test_candidates_need_a_human_and_skip_what_one_shop_sells_side_by_side():

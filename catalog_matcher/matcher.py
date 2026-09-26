@@ -44,12 +44,16 @@ COLOURS = {
     "SATIN SUNBURST": "SSB",
     "NATURAL SATIN": "NS",
     "NATURAL GLOSS": "NAT",
+    "GLOSS NATURAL": "NAT",
+    "SATIN BLACK": "BKS",
     "BLACK SATIN": "BKS",
     "BLACK GLOSS": "BK",
     "OPEN PORE": "OP",
     "AUTUMN BURST": "AB",
     "SUNSET BLUE": "SUNSETBLUE",
     "SMOKY BLACK": "SMB",
+    "RUBY RED": "RR",
+    "TURQUOISE": "TQ",
     "SUNBURST": "SUNBURST",
     "NATURAL": "NAT",
     "BLACK": "BK",
@@ -181,8 +185,14 @@ def link_by(offers: list[Offer], groups: Groups, key, reason: str) -> None:
         if value:
             buckets.setdefault(value, []).append(offer)
     for items in buckets.values():
-        for other in items[1:]:
-            groups.join(items[0].product_id, other.product_id, reason)
+        # A shop does not list the same guitar twice: if one shop has two offers with the same
+        # key ('ALFABETO WALNUT41' and 'WALNUT41 NAT' at different prices), only its first one joins.
+        first_per_shop: dict[str, Offer] = {}
+        for item in items:
+            first_per_shop.setdefault(item.shop, item)
+        joined = list(first_per_shop.values())
+        for other in joined[1:]:
+            groups.join(joined[0].product_id, other.product_id, reason)
 
 
 def build_groups(offers: list[Offer]) -> tuple[Groups, dict[int, list[Offer]]]:
