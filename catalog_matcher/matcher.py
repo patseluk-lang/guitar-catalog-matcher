@@ -3,6 +3,11 @@
 Level 1: identical shop code ("Артикул")                         -> same guitar.
 Level 2: identical normalised name (brand + model + colour code) -> same guitar.
 Level 3: same brand and base model, different suffix/extra words -> for a human to decide.
+
+Shop conventions:
+- no colour in the name means Natural;
+- a bare "SB" means Sunburst, except Yamaha, where SB is its code for Sunset Blue;
+- "-12" after the model means 12 strings, otherwise 6.
 """
 import re
 import sqlite3
@@ -29,7 +34,7 @@ PREFIXES = (
 )
 
 # Colour / finish names -> one code. Longest phrases first.
-# "SB" is deliberately absent: shops use it for Sunburst, Sunset Blue and Smoky Black.
+# A bare "SB" stays "SB" here: name_key reads it through DEFAULT_COLOUR / BRAND_COLOUR.
 COLOURS = {
     "TOBACCO BROWN SUNBURST": "TBS",
     "TABACCO BROWN SUNBURST": "TBS",
@@ -42,13 +47,20 @@ COLOURS = {
     "AUTUMN BURST": "AB",
     "SUNSET BLUE": "SUNSETBLUE",
     "SMOKY BLACK": "SMB",
+    "SUNBURST": "SUNBURST",
     "NATURAL": "NAT",
     "BLACK": "BK",
     "NT": "NAT",
     "BLK": "BK",
 }
-# Abbreviations that mean different colours in different shops, with their possible meanings.
-AMBIGUOUS = {"SB": {"SUNBURST", "SUNSETBLUE", "SMB"}}
+# Default meaning of a bare abbreviation (used for automatic matching).
+DEFAULT_COLOUR = {"SB": "SUNBURST"}
+# Manufacturer's own colour codes that override the default.
+BRAND_COLOUR = {"YAMAHA": {"SB": "SUNSETBLUE"}}
+# Other colours the same abbreviation is sometimes used for (shown to a human, level 3).
+AMBIGUOUS = {"SB": {"SUNSETBLUE", "SMB"}}
+# Natural is the default colour, so it is not part of the name.
+DEFAULT_TOKENS = {"NAT"}
 
 # Characteristics shown next to level 3 candidates.
 SHOWN_FEATURES = ("Верхня дека", "Нижня дека", "Накладка грифа", "Гриф")
@@ -77,7 +89,8 @@ def load_offers(connection: sqlite3.Connection) -> list[Offer]:
 
 
 def name_tokens(name: str) -> list[str]:
-    """'Акустична гітара CORT AD810 (Open Pore)' -> ['CORT', 'AD810', 'OP']"""
+    """'Акустична гітара CORT AD810 (Open Pore)' -> ['CORT', 'AD810', 'OP']
+    'YAMAHA F310 Natural' -> ['YAMAHA', 'F310'] (Natural is the default colour)"""
     text = name.upper()
     for prefix in PREFIXES:
         if text.startswith(prefix):
@@ -87,12 +100,24 @@ def name_tokens(name: str) -> list[str]:
     text = " ".join(text.split())
     for phrase, code in COLOURS.items():
         text = re.sub(rf"(?<![A-Z0-9]){phrase}(?![A-Z0-9])", code, text)
-    return text.split()
+    return [token for token in text.split() if token not in DEFAULT_TOKENS]
 
 
 def name_key(name: str) -> str:
-    """'Акустична гітара CORT AD810 (Open Pore)' and 'Cort AD810 OP' -> 'CORTAD810OP'."""
-    return re.sub(r"[^A-Z0-9А-ЯІЇЄҐ]", "", "".join(name_tokens(name)))
+    """'Акустична гітара CORT AD810 (Open Pore)' and 'Cort AD810 OP' -> 'CORTAD810OP'.
+    'Maxtone WGC4010 SB' and 'Maxtone WGC4010 Sunburst' -> 'MAXTONEWGC4010SUNBURST'.
+    'Yamaha FG820 SB' and 'Yamaha FG820 (Sunset Blue)' -> 'YAMAHAFG820SUNSETBLUE'."""
+    tokens = name_tokens(name)
+    colours = {**DEFAULT_COLOUR, **BRAND_COLOUR.get(tokens[0] if tokens else "", {})}
+    tokens = [colours.get(token, token) for token in tokens]
+    return re.sub(r"[^A-Z0-9А-ЯІЇЄҐ]", "", "".join(tokens))
+
+
+def string_count(name: str) -> int:
+    """'Cort AD810-12 OP' -> 12, 'Cort AD810 OP' -> 6."""
+    text = " ".join(name_tokens(name))
+    twelve = re.search(r"\d-12(?!\d)|(?<![0-9])12[- ]?(?:STRING|STR|СТРУН)", text)
+    return 12 if twelve else 6
 
 
 def model_parts(name: str) -> tuple[str, str, frozenset[str]]:
@@ -177,18 +202,28 @@ def matched_groups(groups: Groups, members: dict[int, list[Offer]]):
     return sorted(result, key=lambda pair: name_key(pair[1][0].name))
 
 
+COLOUR_CODES = set(COLOURS.values()) | set(DEFAULT_COLOUR)
+
+
+def colour_of(others: frozenset[str]) -> frozenset[str]:
+    """Colour words among the extra words; no colour means Natural.
+
+    {'OP', 'W', 'BAG'} -> {'OP'};  {'W', 'BAG'} -> {'NAT'}
+    """
+    return (others & COLOUR_CODES) or frozenset({"NAT"})
+
+
 def colours_compatible(others_a: frozenset[str], others_b: frozenset[str]) -> bool:
     """Could these two sets of extra words describe the same colour?
 
-    Same words, one side without a colour, one side with extra words (w/bag),
-    or an ambiguous abbreviation that may stand for the other side's colour.
+    Same colour (other words such as w/bag are ignored),
+    or an abbreviation that is sometimes used for the other side's colour.
     """
-    if others_a == others_b or not others_a or not others_b:
-        return True
-    if others_a < others_b or others_b < others_a:
+    colour_a, colour_b = colour_of(others_a), colour_of(others_b)
+    if colour_a == colour_b:
         return True
     for short, meanings in AMBIGUOUS.items():
-        for one, other in ((others_a, others_b), (others_b, others_a)):
+        for one, other in ((colour_a, colour_b), (colour_b, colour_a)):
             if short in one and (one - {short}) == (other - meanings) and other & meanings:
                 return True
     return False
@@ -197,10 +232,13 @@ def colours_compatible(others_a: frozenset[str], others_b: frozenset[str]) -> bo
 def needs_human(first: Offer, second: Offer) -> bool:
     """Same brand + base model and compatible colour, but the names still differ.
 
-    'AD810M OP' / 'AD810 OP'  -> True  (index differs, colour the same)
-    'AD810M OP' / 'AD810 BKS' -> False (different colour: simply another product)
-    'FG820 SB'  / 'FG820 Sunset Blue' -> True (SB may mean Sunset Blue)
+    'AD810M OP' / 'AD810 OP'    -> True  (index differs, colour the same)
+    'AD810M OP' / 'AD810 BKS'   -> False (different colour: simply another product)
+    'AD810 OP'  / 'AD810-12 OP' -> False (6 and 12 strings: different guitars)
+    'WGC4010 SB' / 'WGC4010 Sunset Blue' -> True (SB may be used for Sunset Blue)
     """
+    if string_count(first.name) != string_count(second.name):
+        return False
     _, suffix_a, others_a = model_parts(first.name)
     _, suffix_b, others_b = model_parts(second.name)
     if (suffix_a, others_a) == (suffix_b, others_b):
