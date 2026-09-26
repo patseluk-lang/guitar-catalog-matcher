@@ -1,9 +1,11 @@
 """Command line entry point: collect guitars from the selected shops into SQLite."""
 import argparse
 import logging
+import os
 from pathlib import Path
 
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 
 from catalog_matcher.database import Database
 from catalog_matcher.models import Product
@@ -81,9 +83,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def make_driver() -> webdriver.Chrome:
+    """Chrome as usual on a desktop; inside Docker the environment switches on headless mode
+    and points to the Chromium and chromedriver installed in the image."""
+    options = webdriver.ChromeOptions()
+    if os.environ.get("CHROME_HEADLESS") == "1":
+        for argument in ("--headless=new", "--no-sandbox", "--disable-dev-shm-usage",
+                         "--window-size=1920,1080"):
+            options.add_argument(argument)
+    if os.environ.get("CHROME_BINARY"):
+        options.binary_location = os.environ["CHROME_BINARY"]
+    service = Service(os.environ["CHROMEDRIVER"]) if os.environ.get("CHROMEDRIVER") else None
+    return webdriver.Chrome(options=options, service=service)
+
+
 def collect(db: Database, run_id: int, args: argparse.Namespace) -> list[Product]:
     products: list[Product] = []
-    driver = webdriver.Chrome()
+    driver = make_driver()
     try:
         for shop in args.shops:
             known = set() if args.refresh_details else db.urls_with_features(shop)

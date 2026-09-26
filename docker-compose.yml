@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    environment:
+      TZ: Europe/Kyiv  # the same clock as runs made without Docker
+    # The database, logs, reports and screenshots stay in the project folder on the host.
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./reports:/app/reports
+      - ./screenshots:/app/screenshots
+    shm_size: "1gb"  # Chromium needs more shared memory than Docker gives by default

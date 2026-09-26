@@ -19,6 +19,7 @@ def driver():
     options = webdriver.ChromeOptions()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")  # small /dev/shm inside Docker
     # Optional overrides for machines where Chrome is not installed in the usual place (e.g. CI).
     if os.environ.get("CHROME_BINARY"):
         options.binary_location = os.environ["CHROME_BINARY"]

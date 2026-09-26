@@ -111,6 +111,7 @@ What the data shows:
 
 ```
 main.py                       CLI: collect into SQLite
+Dockerfile, docker-compose.yml  headless run in a container
 catalog_matcher/
     models.py                 Product dataclass
     database.py               SQLite schema and storage
@@ -149,6 +150,21 @@ python -m catalog_matcher.report                # reports/report.html and report
 ```
 
 `offers.csv` uses `;` and UTF-8 with BOM, so Excel opens it with Cyrillic intact.
+
+### With Docker
+
+The image contains Python, headless Chromium and its driver, so nothing else has to be
+installed. The database, logs, reports and screenshots stay in the project folder on the host.
+
+```
+docker compose build
+docker compose run --rm app main.py --pages 3            # collect
+docker compose run --rm app -m catalog_matcher.matcher   # match
+docker compose run --rm app -m catalog_matcher.report    # reports/report.html, reports/offers.csv
+docker compose run --rm app -m pytest                    # all tests inside the container
+```
+
+`docker compose run --rm app <arguments>` runs `python <arguments>` in the container.
 
 ## Tests
 

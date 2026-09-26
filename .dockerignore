@@ -1,0 +1,12 @@
+.venv/
+.git/
+.idea/
+__pycache__/
+.pytest_cache/
+data/
+logs/
+reports/
+screenshots/
+*.db
+step*_*.py
+step*_*.txt
