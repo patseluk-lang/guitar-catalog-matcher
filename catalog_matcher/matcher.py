@@ -3,6 +3,7 @@
 Level 1: identical shop code ("Артикул")                         -> same guitar.
 Level 2: identical normalised name (brand + model + colour code) -> same guitar.
 Level 3: same brand and base model, different suffix/extra words -> for a human to decide.
+Conflicts: the same guitar (levels 1-2) described with different wood by different shops.
 
 Shop conventions:
 - no colour in the name means Natural;
@@ -14,6 +15,8 @@ import sqlite3
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from catalog_matcher.normalize import FIELDS, NOT_SPECIFIED, normalise
 
 DB_PATH = Path("data") / "catalog.db"
 
@@ -275,6 +278,29 @@ def candidates(members: dict[int, list[Offer]]) -> list[tuple[Offer, Offer]]:
     return sorted(pairs, key=lambda pair: model_parts(pair[0].name)[0])
 
 
+def conflicts(groups) -> list[tuple[list[Offer], dict[str, dict[str, str]]]]:
+    """Groups where shops name different wood for the same part.
+
+    'не вказано' is not a conflict: one shop simply did not say.
+    Returns [(offers, {part: {shop: value}})].
+    """
+    result = []
+    for _, items in groups:
+        normal = {offer.shop: normalise(offer.features) for offer in items}
+        differing = {}
+        for part in FIELDS:
+            values = {
+                shop: features[part]
+                for shop, features in normal.items()
+                if features.get(part, NOT_SPECIFIED) != NOT_SPECIFIED
+            }
+            if len(set(values.values())) > 1:
+                differing[part] = values
+        if differing:
+            result.append((items, differing))
+    return result
+
+
 def print_groups(groups) -> None:
     print("=== Levels 1-2: same guitar ===")
     for evidence, items in groups:
@@ -301,6 +327,16 @@ def print_candidates(pairs: list[tuple[Offer, Offer]]) -> None:
     print(f"\nCandidates for manual check: {len(pairs)}")
 
 
+def print_conflicts(found) -> None:
+    print("\n=== Same guitar, different wood by shop ===")
+    for items, differing in found:
+        print(f"\n{name_key(items[0].name)}")
+        for part, values in differing.items():
+            shown = "; ".join(f"{shop}: {value}" for shop, value in sorted(values.items()))
+            print(f"    {part:<15} {shown}")
+    print(f"\nGroups with conflicting characteristics: {len(found)}")
+
+
 def main() -> None:
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else DB_PATH
     connection = sqlite3.connect(str(path))
@@ -309,8 +345,10 @@ def main() -> None:
     finally:
         connection.close()
     groups, members = build_groups(offers)
-    print_groups(matched_groups(groups, members))
+    same_guitar = matched_groups(groups, members)
+    print_groups(same_guitar)
     print_candidates(candidates(members))
+    print_conflicts(conflicts(same_guitar))
 
 
 if __name__ == "__main__":
